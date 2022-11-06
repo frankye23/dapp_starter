@@ -7,7 +7,6 @@ const add = () => count.value++
 
 <template>
   <div class="text-center">
-    <p>Home: {{ count }}</p>
-    <button class="btn" @click="add">Count</button>
+    This is home page
   </div>
 </template>

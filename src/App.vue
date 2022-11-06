@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import LayoutHeader from './components/LayoutHeader.vue'
 import { MetaMaskConnector, WalletConnectConnector, CoinbaseWalletConnector } from 'vue-dapp'
 
 const infuraId = ''
@@ -23,7 +22,6 @@ const connectors = [
 </script>
 
 <template>
-  <layout-header />
 
   <router-view></router-view>
 
