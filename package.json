@@ -7,6 +7,9 @@
     "serve": "vite preview"
   },
   "dependencies": {
+    "@web3-onboard/injected-wallets": "^2.6.1",
+    "@web3-onboard/vue": "^2.5.0",
+    "@web3-onboard/walletconnect": "^2.2.2",
     "buffer": "^6.0.3",
     "daisyui": "^2.38.1",
     "ethers": "^5.5.2",

@@ -1,21 +1,3 @@
-<script setup lang="ts">
-import { useBoard, useEthers, useWallet, displayEther, shortenAddress } from 'vue-dapp'
-
-const { open } = useBoard()
-const { address, balance, isActivated } = useEthers()
-
-const navigation: { name: string; href: string }[] = [
-  {
-    name: 'stake',
-    href: '/stake',
-  },
-  {
-    name: 'reward',
-    href: '/reward',
-  },
-]
-</script>
-
 <template>
   <header class="w-full px-4">
     <div class="flex justify-between p-4 px-3">
@@ -25,7 +7,7 @@ const navigation: { name: string; href: string }[] = [
             <div class="flex space-x-4 items-center">
               <!-- logo -->
               <img class="h-10 min-w-10" src="../../../../assets/logo.png" alt="logo" />
-              <p class="hover:text-gray-900">Dx Staking</p>
+              <p class="hover:text-gray-900">Dapp Starter</p>
             </div>
           </router-link>
 
@@ -56,10 +38,58 @@ const navigation: { name: string; href: string }[] = [
               </div>
             </div>
 
-            <button v-else @click="open" class="btn">Connect Wallet</button>
+            <button v-else @click="connect" class="btn">Connect Wallet</button>
           </div>
         </div>
       </nav>
     </div>
   </header>
 </template>
+
+<script setup lang="ts">
+import { useBoard, useEthers, useWallet, displayEther, shortenAddress } from 'vue-dapp'
+import { init } from '@web3-onboard/vue'
+import { useOnboard } from '@web3-onboard/vue'
+import injectedModule from '@web3-onboard/injected-wallets'
+import walletConnectModule from '@web3-onboard/walletconnect'
+const walletConnect = walletConnectModule()
+
+const { open } = useBoard()
+const { address, balance, isActivated } = useEthers()
+const injected = injectedModule()
+const infuraKey = '6abb27120bfc49fc9081be895d20b382'
+const rpcUrl = `https://mainnet.infura.io/v3/${infuraKey}`
+
+const wallets = [injected, walletConnect]
+
+const web3Onboard = init({
+  wallets: wallets,
+  chains: [
+    {
+      id: '0x1',
+      token: 'ETH',
+      label: 'Ethereum Mainnet',
+      rpcUrl
+    }
+  ]
+})
+
+const { connectWallet, disconnectConnectedWallet, connectedWallet } = useOnboard()
+
+if (connectedWallet) {
+  // const ethersProvider = new ethers.providers.Web3Provider(connectedWallet.provider, 'any')
+  // ..... do stuff with the provider
+}
+const connect = async () => connectWallet()
+
+const navigation: { name: string; href: string }[] = [
+  {
+    name: 'stake',
+    href: '/stake',
+  },
+  {
+    name: 'reward',
+    href: '/reward',
+  },
+]
+</script>
