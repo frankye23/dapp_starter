@@ -6,7 +6,7 @@ const add = () => count.value++
 </script>
 
 <template>
-  <div class="text-center">
+  <div class="text-center mt-12">
     This is home page
   </div>
 </template>

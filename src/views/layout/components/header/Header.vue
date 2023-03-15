@@ -1,95 +1,238 @@
 <template>
-  <header class="w-full px-4">
-    <div class="flex justify-between p-4 px-3">
-      <nav class="w-full">
-        <div class="flex items-center justify-between">
-          <router-link to="/" active-class="text-gray-900" class="text-xl text-gray-600">
-            <div class="flex space-x-4 items-center">
-              <!-- logo -->
-              <img class="h-10 min-w-10" src="../../../../assets/logo.png" alt="logo" />
-              <p class="hover:text-gray-900">Dapp Starter</p>
-            </div>
-          </router-link>
+  <div class="shadow-sm shadow-slate-100">
+    <div class="max-w-screen-xl px-8 mx-auto">
+      <header class="flex justify-between items-center py-4 md:py-4">
+        <div class="flex items-center">
+          <!-- logo -->
+          <a href="/" class="flex items-center text-black-800 text-xl font-medium gap-2.5" aria-label="logo">
+            <img src="../../../../assets/logo.png" alt="logo" class="w-8 block img-container">
+            <span class="logo-title">dapp-starter</span>
+          </a>
+        </div>
+        <!-- connect button -->
+        <div class="flex items-center" v-if="!state.isDapp">
+          <network-list />
+          <button v-if="wallets.length > 0" @click="show = true" class="btn btn-sm btn-info border-none ml-4 h-9 w-36 hover:bg-[#0099cc] text-white">{{ cutString(state.address,4,6) }}</button>
+          <button v-else @click="connect" class="btn btn-sm btn-info border-none ml-4 h-9 w-36 hover:bg-[#0099cc] text-white">Connect</button>
+        </div>
+        <div v-else class="btn btn-sm btn-info border-none ml-4 h-9 w-36 hover:bg-[#0099cc] text-white">{{ cutString(state.address,4,6) }}</div>
+        
+        <!-- account center -->
+        <div aria-live="assertive" class="z-20 pointer-events-none fixed inset-0 flex items-end px-4 py-6 sm:items-start sm:p-6 mt-12">
+          <div class="flex w-full flex-col items-center space-y-4 sm:items-end">
 
-          <div class="flex items-center space-x-10">
-            <!-- router -->
-            <router-link
-              v-for="link in navigation"
-              :key="link.name"
-              :to="link.href"
-              active-class="text-gray-900"
-              exact
-              class="text-gray-600 hover:text-gray-900"
-            >
-              {{ link.name }}
-            </router-link>
-
-            <div v-if="isActivated" class="flex items-center">
-              <!-- Account -->
-              <div class="sm:hidden py-2 px-3 rounded-2xl inline-block bg-gray-100">
-                {{ shortenAddress(address) }}
-              </div>
-
-              <div class="hidden sm:flex py-1 px-2 flex items-center rounded-3xl border border-solid">
-                <div class="px-1 mr-1">{{ displayEther(balance) }} ETH</div>
-                <div class="py-2 px-3 rounded-2xl inline-block bg-gray-100">
-                  {{ shortenAddress(address) }}
+            <transition enter-active-class="transform ease-out duration-300 transition" enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2" enter-to-class="translate-y-0 opacity-100 sm:translate-x-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
+              <div v-if="show" class="pointer-events-auto w-full max-w-sm overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+                <div class="p-4">
+                  <div class="flex items-start">
+                    
+                    <div class="ml-3 w-0 flex-1 pt-0.5">
+                      <h1 class="text-xl font-semibold text-gray-900">Account</h1>
+                      <div class="mt-4 text-sm text-gray-500">Connected Wallet Address</div>
+                      <p class="text-sm font-semibold text-gray-500 mt-2 flex items-center">
+                        {{ cutString(state.address,4,6) }}
+                        <span class="ml-2 cursor-pointer copy" :data-clipboard-text="state.address" @click="copy">
+                          <DocumentDuplicateIcon class="h-5 w-5" />
+                        </span>
+                      </p>
+                      <div class="text-sm my-4 flex items-center cursor-pointer" @click="goExplore">
+                        View on explorer
+                        <span><ArrowTopRightOnSquareIcon class="w-5 h-5 ml-2" /></span>
+                      </div>
+                    </div>
+                    <div class="ml-4 flex cursor-pointer">
+                      <XMarkIcon class="h-5 w-5" aria-hidden="true" @click="show = false" />
+                    </div>
+                  </div>
+                  <button class="btn btn-sm btn-info text-white w-full" @click="onDisconnect">Disconnect</button>
                 </div>
               </div>
-            </div>
-
-            <button v-else @click="connect" class="btn">Connect Wallet</button>
+            </transition>
           </div>
         </div>
-      </nav>
+      </header>
     </div>
-  </header>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { useBoard, useEthers, useWallet, displayEther, shortenAddress } from 'vue-dapp'
-import { init } from '@web3-onboard/vue'
-import { useOnboard } from '@web3-onboard/vue'
+import { onMounted, reactive, ref, getCurrentInstance } from 'vue'
+import { useOnboard, init } from '@web3-onboard/vue'
+import { cutString } from '@/common'
+import { ethers } from 'ethers'
+import { useGlobalState } from '@/store'
+import { XMarkIcon, DocumentDuplicateIcon, ArrowTopRightOnSquareIcon } from '@heroicons/vue/20/solid'
+
+import WalletConnect from "@walletconnect/client"
 import injectedModule from '@web3-onboard/injected-wallets'
 import walletConnectModule from '@web3-onboard/walletconnect'
-const walletConnect = walletConnectModule()
+import EthIcon from '../../../../assets/logo.png'
+import Clipboard from 'clipboard'
+import NetworkList from './NetworkList.vue'
 
-const { open } = useBoard()
-const { address, balance, isActivated } = useEthers()
+const globalState = useGlobalState()
+let signer: ethers.providers.Provider | ethers.Signer | undefined
+let provider: any
+if (typeof window.ethereum !== 'undefined') {
+  try {
+    // @ts-ignore
+    provider = new ethers.providers.Web3Provider(window.ethereum)
+  } catch (e) {
+    console.error('Cannot initialize Web3Provider', e);
+  }
+} else {
+  console.error('Web3Provider not available');
+}
+
+const walletConnect = walletConnectModule({
+  bridge: 'https://bridge.walletconnect.org',
+  qrcodeModalOptions: {
+    mobileLinks: ['rainbow', 'metamask', 'argent', 'trust', 'imtoken', 'pillar']
+  },
+  connectFirstChainId: true,
+})
+
 const injected = injectedModule()
 const infuraKey = '6abb27120bfc49fc9081be895d20b382'
-const rpcUrl = `https://mainnet.infura.io/v3/${infuraKey}`
-
-const wallets = [injected, walletConnect]
+const walletList = [injected, walletConnect]
 
 const web3Onboard = init({
-  wallets: wallets,
+  wallets: walletList,
   chains: [
     {
       id: '0x1',
       token: 'ETH',
       label: 'Ethereum Mainnet',
-      rpcUrl
+      rpcUrl: `https://mainnet.infura.io/v3/${infuraKey}`
+    },
+    {
+      id: '0x5',
+      token: 'GoerliETH',
+      label: 'Goerli',
+      rpcUrl:`https://goerli.infura.io/v3/${infuraKey}`
     }
-  ]
+  ],
+  appMetadata: {
+    name: 'Batch Send',
+    description: 'Batch Send',
+    icon: EthIcon
+  }
 })
 
-const { connectWallet, disconnectConnectedWallet, connectedWallet } = useOnboard()
+const { connectWallet, disconnectConnectedWallet, wallets, connectedWallet } = useOnboard()
 
-if (connectedWallet) {
-  // const ethersProvider = new ethers.providers.Web3Provider(connectedWallet.provider, 'any')
-  // ..... do stuff with the provider
+const state = reactive({
+  isActive:false,
+  isDapp: false,
+  address:''
+})
+const { proxy } = getCurrentInstance() as any
+const show = ref(false)
+
+const connect = async () => {
+  await connectWallet()
+  if(wallets.value.length > 0){
+    state.isActive = true
+  }
+  globalState.wallets.value = wallets.value
+  // get address
+  await getSigner()
+
 }
-const connect = async () => connectWallet()
 
-const navigation: { name: string; href: string }[] = [
-  {
-    name: 'stake',
-    href: '/stake',
-  },
-  {
-    name: 'reward',
-    href: '/reward',
-  },
-]
+const onDisconnect = () => {
+  show.value = false
+  globalState.address.value = ''
+  disconnectConnectedWallet()
+}
+
+const getSigner = async() => {
+  const data = JSON.parse(localStorage.getItem('alreadyConnectedWallets') as any)
+  
+  if(!connectedWallet.value && data[0] === 'WalletConnect') {
+    const connector = new WalletConnect({
+      bridge: "https://bridge.walletconnect.org", // Required
+      clientMeta:{
+        description:'dapp-starter',
+        url:'',
+        icons:['https://file.test.fxwallet.com/1673257212883-logo.png'],
+        name:'dapp-starter',
+      }
+    });
+    if (connector.connected) {
+      const { accounts } = connector;
+      state.address = accounts[0]
+      globalState.address.value = accounts[0]
+    }
+  }
+
+  if(connectedWallet.value?.label === 'WalletConnect') {
+    const walletConnectProvider = new ethers.providers.Web3Provider(connectedWallet.value?.provider)
+    // localStorage.setItem('walletConnectProvider', walletConnectProvider)
+    signer = walletConnectProvider.getSigner()
+    // @ts-ignore
+    state.address = await signer?.getAddress()
+    globalState.address.value = state.address
+  } else {
+    // if not walletconnect
+    // @ts-ignore
+    if (typeof window.ethereum !== 'undefined') {
+      // @ts-ignore
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+
+      // 获取当前账户地址
+      signer.getAddress().then((address: any) => {
+        state.address = address
+        globalState.address.value = state.address
+
+      });
+    } else {
+      // 提示用户安装 MetaMask 或其他支持 Web3Provider 的插件
+      console.error('Please install MetaMask or other Web3Provider-enabled browser extension.');
+    }
+  }
+}
+
+const goExplore = () => {
+  window.open(`https://goerli.etherscan.io/address/${state.address}`)
+}
+
+const copy = () => {
+  let clipboard = new Clipboard('.copy')
+  clipboard.on('success', (e: any) => {      
+    proxy.$message({ type:'success', str: 'Copy successfully' })
+    // release
+    clipboard.destroy()
+  })
+  clipboard.on('error', (e: any) => {
+    console.log('copy not support', e)
+    clipboard.destroy()
+  })
+}
+
+const loadApp = async() => {
+  // @ts-ignore
+  if(!window.web3?.currentProvider?.isInject) {
+    // get address and signer
+    await getSigner()
+    state.isDapp = false
+  } else{
+    state.isDapp = true
+    // @ts-ignore
+    let result = await window?.web3?.currentProvider.request({ method:'eth_chainId' })
+    if(result) {
+      // @ts-ignore
+      let account = await window?.web3?.currentProvider.request({ method:'eth_accounts' })
+      state.address = account[0]
+    }
+  }
+}
+
+onMounted(() => {
+  loadApp()
+})
+
 </script>
+<style scoped>
+</style>

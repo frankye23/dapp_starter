@@ -19,19 +19,6 @@ import {
             title: 'Home',
           },
         },
-        {
-          path: '/stake',
-          name: 'stake',
-          component: () => import('@/views/stake/Index.vue')
-        },
-        {
-          path: '/reward',
-          name: 'reward',
-          component: () => import('@/views/reward/Index.vue')
-        },
-       
-        
-        
       ]
     },
     
