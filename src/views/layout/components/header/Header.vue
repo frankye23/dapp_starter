@@ -60,7 +60,7 @@ import { onMounted, reactive, ref, getCurrentInstance } from 'vue'
 import { useOnboard, init } from '@web3-onboard/vue'
 import { cutString } from '@/common'
 import { ethers } from 'ethers'
-import { useGlobalState } from '@/store'
+import { useUserStore } from "@/store/modules/user"
 import { XMarkIcon, DocumentDuplicateIcon, ArrowTopRightOnSquareIcon } from '@heroicons/vue/20/solid'
 
 import WalletConnect from "@walletconnect/client"
@@ -70,12 +70,10 @@ import EthIcon from '../../../../assets/logo.png'
 import Clipboard from 'clipboard'
 import NetworkList from './NetworkList.vue'
 
-const globalState = useGlobalState()
 let signer: ethers.providers.Provider | ethers.Signer | undefined
 let provider: any
 if (typeof window.ethereum !== 'undefined') {
   try {
-    // @ts-ignore
     provider = new ethers.providers.Web3Provider(window.ethereum)
   } catch (e) {
     console.error('Cannot initialize Web3Provider', e);
@@ -83,7 +81,7 @@ if (typeof window.ethereum !== 'undefined') {
 } else {
   console.error('Web3Provider not available');
 }
-
+const store = useUserStore()
 const walletConnect = walletConnectModule({
   bridge: 'https://bridge.walletconnect.org',
   qrcodeModalOptions: {
@@ -134,7 +132,7 @@ const connect = async () => {
   if(wallets.value.length > 0){
     state.isActive = true
   }
-  globalState.wallets.value = wallets.value
+  store.account = wallets.value
   // get address
   await getSigner()
 
@@ -142,7 +140,7 @@ const connect = async () => {
 
 const onDisconnect = () => {
   show.value = false
-  globalState.address.value = ''
+  store.account = ''
   disconnectConnectedWallet()
 }
 
@@ -162,30 +160,24 @@ const getSigner = async() => {
     if (connector.connected) {
       const { accounts } = connector;
       state.address = accounts[0]
-      globalState.address.value = accounts[0]
+      store.account = accounts[0]
     }
   }
 
   if(connectedWallet.value?.label === 'WalletConnect') {
     const walletConnectProvider = new ethers.providers.Web3Provider(connectedWallet.value?.provider)
-    // localStorage.setItem('walletConnectProvider', walletConnectProvider)
     signer = walletConnectProvider.getSigner()
-    // @ts-ignore
     state.address = await signer?.getAddress()
-    globalState.address.value = state.address
+    store.account = state.address
   } else {
     // if not walletconnect
-    // @ts-ignore
     if (typeof window.ethereum !== 'undefined') {
-      // @ts-ignore
       provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-
       // 获取当前账户地址
       signer.getAddress().then((address: any) => {
         state.address = address
-        globalState.address.value = state.address
-
+        store.account = state.address
       });
     } else {
       // 提示用户安装 MetaMask 或其他支持 Web3Provider 的插件
@@ -212,17 +204,14 @@ const copy = () => {
 }
 
 const loadApp = async() => {
-  // @ts-ignore
   if(!window.web3?.currentProvider?.isInject) {
     // get address and signer
     await getSigner()
     state.isDapp = false
   } else{
     state.isDapp = true
-    // @ts-ignore
     let result = await window?.web3?.currentProvider.request({ method:'eth_chainId' })
     if(result) {
-      // @ts-ignore
       let account = await window?.web3?.currentProvider.request({ method:'eth_accounts' })
       state.address = account[0]
     }
